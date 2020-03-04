@@ -4,8 +4,6 @@ var path     = require("path"),
     pkg      = require("./package.json"),
     util     = require("./util");
 
-util.setup();
-
 var protobuf = require(util.pathToProtobufJs),
     minimist = require("minimist"),
     chalk    = require("chalk"),
