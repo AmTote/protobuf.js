@@ -1,6 +1,6 @@
 "use strict";
 var fs            = require("fs"),
-    path          = require("path"),
+    path          = require("path");
 
 try {
     // installed as a peer dependency
