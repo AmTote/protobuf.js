@@ -8,7 +8,8 @@ var child_process = require("child_process"),
 var minimist = require("minimist"),
     chalk    = require("chalk"),
     glob     = require("glob"),
-    tmp      = require("tmp");
+    tmp      = require("tmp"),
+    which    = require("which");
 
 /**
  * Runs pbts programmatically.
@@ -26,10 +27,11 @@ exports.main = function(args, callback) {
             import: "i"
         },
         string: [ "name", "out", "global", "import" ],
-        boolean: [ "comments", "main" ],
+        boolean: [ "comments", "main", "npx" ],
         default: {
             comments: true,
-            main: false
+            main: false,
+            npx: false
         }
     });
 
@@ -57,6 +59,8 @@ exports.main = function(args, callback) {
                 "  -n, --name      Wraps everything in a module of the specified name.",
                 "",
                 "  -m, --main      Whether building the main library without any imports.",
+                "",
+                "  --npx           Execute child processes (jsdoc specifically) using `npx` instead of `node` as jsdoc does not support PnP module resolution. This is required when using Yarn 2",
                 "",
                 "usage: " + chalk.bold.green("pbts") + " [options] file1.js file2.js ..." + chalk.bold.gray("  (or)  ") + "other | " + chalk.bold.green("pbts") + " [options] -",
                 ""
@@ -99,12 +103,28 @@ exports.main = function(args, callback) {
         // There is no proper API for jsdoc, so this executes the CLI and pipes the output
         var basedir = path.join(__dirname, ".");
         var moduleName = argv.name || "null";
-        var nodePath = process.execPath;
-        var cmd = "\"" + nodePath + "\" \"" + require.resolve("jsdoc/jsdoc.js") + "\" -c \"" + path.join(basedir, "lib", "tsd-jsdoc.json") + "\" -q \"module=" + encodeURIComponent(moduleName) + "&comments=" + Boolean(argv.comments) + "\" " + files.map(function(file) { return "\"" + file + "\""; }).join(" ");
+        var execPath;
+        if (argv.npx) {
+            const npxPath = which.sync('npx')
+            if (!npxPath || npxPath.length === 0) {
+                var err = new Error("Unable to find 'npx' executable in path");
+                if (callback) {
+                    return callback(err);
+                }
+                throw err;
+            }
+            execPath = "\"" + npxPath + "\" jsdoc"
+        } else {
+            execPath = "\"" + process.execPath + "\" \"" + require.resolve("jsdoc/jsdoc.js") + "\"";
+        }
+        var cmd = execPath + " -c \"" + path.join(basedir, "lib", "tsd-jsdoc.json") + "\" -q \"module=" + encodeURIComponent(moduleName) + "&comments=" + Boolean(argv.comments) + "\" " + files.map(function(file) { return "\"" + file + "\""; }).join(" ");
         var child = child_process.exec(cmd, {
             cwd: process.cwd(),
             argv0: "node",
             stdio: "pipe",
+            env: {
+                PATH: path.dirname(process.execPath) // only include the NodeJS executable in the path to prevent invalid resolutions
+            },
             maxBuffer: 1 << 24 // 16mb
         });
         var out = [];
@@ -152,7 +172,7 @@ exports.main = function(args, callback) {
             output.push(
                 "import * as Long from \"long\";",
                 ""
-            );               
+            );
             if (argv.global)
                 output.push(
                     "export as namespace " + argv.global + ";",
