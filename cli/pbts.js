@@ -27,11 +27,12 @@ exports.main = function(args, callback) {
             import: "i"
         },
         string: [ "name", "out", "global", "import" ],
-        boolean: [ "comments", "main", "npx" ],
+        boolean: [ "comments", "main", "npx", "yarn" ],
         default: {
             comments: true,
             main: false,
-            npx: false
+            npx: false,
+            yarn: false
         }
     });
 
@@ -61,6 +62,7 @@ exports.main = function(args, callback) {
                 "  -m, --main      Whether building the main library without any imports.",
                 "",
                 "  --npx           Execute child processes (jsdoc specifically) using `npx` instead of `node` as jsdoc does not support PnP module resolution. This is required when using Yarn 2",
+                "  --yarn          Execute child process using `yarn node` instead of using the normal NodeJS execution",
                 "",
                 "usage: " + chalk.bold.green("pbts") + " [options] file1.js file2.js ..." + chalk.bold.gray("  (or)  ") + "other | " + chalk.bold.green("pbts") + " [options] -",
                 ""
@@ -113,7 +115,9 @@ exports.main = function(args, callback) {
                 }
                 throw err;
             }
-            execPath = "\"" + npxPath + "\" jsdoc"
+            execPath = "\"" + npxPath + "\" jsdoc";
+        } else if (argv.yarn) {
+            execPath = "yarn node \"" + require.resolve("jsdoc/jsdoc.js") + "\"";
         } else {
             execPath = "\"" + process.execPath + "\" \"" + require.resolve("jsdoc/jsdoc.js") + "\"";
         }
@@ -122,7 +126,7 @@ exports.main = function(args, callback) {
             cwd: process.cwd(),
             argv0: "node",
             stdio: "pipe",
-            env: {
+            env: argv.yarn ? process.env : {
                 PATH: path.dirname(process.execPath) // only include the NodeJS executable in the path to prevent invalid resolutions
             },
             maxBuffer: 1 << 24 // 16mb
